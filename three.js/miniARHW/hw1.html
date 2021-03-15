@@ -23,7 +23,7 @@ var stats;
 var arToolKitSource, arToolKitContext;
 var markerHiro;
 
-var theta = 0;
+var theta = 0, up = true;
 
 init();
 animate();
@@ -121,12 +121,17 @@ function addMarkerHiro(){
 	markerRoot.add (mesh);
 */
 
-	var ball = new THREE.Mesh (new THREE.SphereGeometry (0.1, 20,20), new THREE.MeshNormalMaterial());
+	var ball = new THREE.Mesh (new THREE.SphereGeometry (0.2, 20,20), new THREE.MeshNormalMaterial());
 	markerRoot.add (ball);
 	ball.position.y = 0.1;
+	ball.position.z = 0.5;
 	
 	var grid = new THREE.GridHelper (1, 10, 'red', 'white');
 	markerRoot.add (grid);
+	
+	var cylinder = new THREE.Mesh( new THREE.CylinderGeometry( 0.25, 0.25, 0.5, 32 ), new THREE.MeshBasicMaterial( {color: 0xfff675} ) );
+	markerRoot.add( cylinder );
+	cylinder.position.set(0, 0, 0);
 			
 	return markerRoot;
 }	
@@ -140,6 +145,14 @@ function animate() {
 
 	theta += 0.01;
 	markerHiro.children[0].position.set (0.5*Math.sin(theta), 0.1, 0.5*Math.cos(theta));
+	markerHiro.children[2].color = 0xfff675;
+	if(markerHiro.children[2].position.y >= 1){
+		up = false;
+		markerHiro.children[2].color = 0xfcba03;
+	}
+	else if(markerHiro.children[2].position.y <= 0) up = true;
+	if(up) markerHiro.children[2].position.y += 0.01;
+	else markerHiro.children[2].position.y -= 0.01;
 	
 	renderer.render (scene, camera);	
 }

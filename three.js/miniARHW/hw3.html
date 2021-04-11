@@ -18,34 +18,26 @@
 <div style='position: absolute; top: 10px; width:100%; text-align: center; z-index: 1;'>
 <a href="https://github.com/jeromeetienne/AR.js/" target="_blank">AR.js</a>
 	 - three.js<br>
-Minimal Version hw2
+Minimal Version hw3
 <div id='heading'>
-<button id = 'toggle'>go</button>
 <p id = "text" style = "color:red"> color </p>
 </div>
 </div>
 
 <script>
+//https://i.imgur.com/8FQCB3B.png
+//button
 
-document.getElementById("toggle").onclick = function (){
-	if(clickonce === 0){
-		theta = 1;
-		clickonce = 1;
-		document.getElementById("toggle").innerHTML = "stop";
-	}
-	else if(clickonce === 1){
-		clickonce = 2;
-		document.getElementById("toggle").innerHTML = "go";
-	}
-};
+
 
 // global variables
 var renderer, scene, camera;
+var sceneHUD, cameraHUD;
 var stats;
 var arToolKitSource, arToolKitContext;
 var markerHiro;
 
-var theta = 0, clickonce = 0;
+var theta = 0, clickonce = 0, button;
 
 init();
 animate();
@@ -70,9 +62,11 @@ function init() {
 
 	// init scene and camera
 	scene	= new THREE.Scene();
-	
+	renderer.autoClear = false;
+	sceneHUD = new THREE.Scene();
 	// Create a BASIC camera
 	camera = new THREE.Camera();
+	cameraHUD = new THREE.OrthographicCamera(-10, 10, 10, -10, -10, 1000);
 	scene.add(camera);
 
 	////////////////////////////////////////////////////////////////////////////////
@@ -118,7 +112,17 @@ function init() {
 
 	markerHiro = addMarkerHiro();
 	scene.add (markerHiro); 
-	
+	/*
+	var _iosDevice = !!navigator.platform.match(/iPhone|iPod|iPad/);
+	if(_iosDevice){
+		document.getElementById("_iosDevice").text('use iPhone|iPad');
+		document.addEventListener('touchstart', onDocumentTouchStart, false);
+		document.addEventListener('touchmove', onDocumentTouchStart, false);
+	}else{
+		document.getElementById("_iosDevice").text('regolar');
+		document.addEventListener('mousemove', onDocumentMouseMove, false);
+	}*/
+	//window.addEventListener('touchstart', onDocumentTouchStart, false);
 }
 	
 function addMarkerHiro(){
@@ -143,9 +147,9 @@ function addMarkerHiro(){
 	markerRoot.add (mesh);
 */
 
-	var circle0 = new THREE.Mesh (new THREE.CircleGeometry( 2, 32 , Math.PI/2, 2*Math.PI/3), new THREE.MeshBasicMaterial( { color: 0xff0000, side: THREE.DoubleSide } ));
-	var circle1 = new THREE.Mesh (new THREE.CircleGeometry( 2, 32 , Math.PI/2 + 2*Math.PI/3, 2*Math.PI/3), new THREE.MeshBasicMaterial( { color: 0x00ff00, side: THREE.DoubleSide } ));
-	var circle2 = new THREE.Mesh (new THREE.CircleGeometry( 2, 32 , Math.PI/2 - 2*Math.PI/3, 2*Math.PI/3), new THREE.MeshBasicMaterial( { color: 0x0000ff, side: THREE.DoubleSide } ));
+	var circle0 = new THREE.Mesh (new THREE.CircleGeometry( 1, 32 , Math.PI/2, 2*Math.PI/3), new THREE.MeshBasicMaterial( { color: 0xff0000, side: THREE.DoubleSide } ));
+	var circle1 = new THREE.Mesh (new THREE.CircleGeometry( 1, 32 , Math.PI/2 + 2*Math.PI/3, 2*Math.PI/3), new THREE.MeshBasicMaterial( { color: 0x00ff00, side: THREE.DoubleSide } ));
+	var circle2 = new THREE.Mesh (new THREE.CircleGeometry( 1, 32 , Math.PI/2 - 2*Math.PI/3, 2*Math.PI/3), new THREE.MeshBasicMaterial( { color: 0x0000ff, side: THREE.DoubleSide } ));
 	let group = new THREE.Group();
 	group.add(circle0);
 	group.add(circle1);
@@ -153,13 +157,30 @@ function addMarkerHiro(){
 	markerRoot.add (group);
 	group.rotation.x -= Math.PI/2;
 	
-	var cylinder = new THREE.Mesh( new THREE.CylinderGeometry( 0.1, 0.2, 0.5, 32 ), new THREE.MeshBasicMaterial( {color: 0xffffff} ) );
+	var cylinder = new THREE.Mesh( new THREE.CylinderGeometry( 0.01, 0.1, 0.5, 32 ), new THREE.MeshBasicMaterial( {color: 0xffffff} ) );
 	markerRoot.add (cylinder);
-	cylinder.position.z = 1.9;
+	cylinder.position.z = 0.9;
 	cylinder.rotation.x = -Math.PI/2;
 	
-	var grid = new THREE.GridHelper (1, 10, 'red', 'white');
-	markerRoot.add (grid);
+	//button
+	var whRatio = window.innerWidth / window.innerHeight;
+	var halfH = 10;
+	var halfW = whRatio * halfH;
+	var loader = new THREE.TextureLoader();
+	loader.setCrossOrigin('');
+
+	loader.load(
+		'https://i.imgur.com/b6I5kb7.png',
+		function(texture) {
+			var texMat = new THREE.MeshBasicMaterial({
+				map: texture
+			});
+			button = new THREE.Mesh(new THREE.CircleGeometry(halfW / 15, 32), texMat);
+			sceneHUD.add(button);
+			button.position.set(window.innerWidth / 2, window.innerHeight / 2, 0);
+			console.log(button.position);
+		},
+	);
 			
 	return markerRoot;
 }	
@@ -173,7 +194,6 @@ function animate() {
 	if(clickonce === 2) theta -= 0.01;
 	if(theta <= 0){
 		clickonce = 0;
-		console.log(markerHiro.children[0].rotation.z % Math.PI*2);
 		if((markerHiro.children[0].rotation.z % (Math.PI*2)) >= Math.PI/3 & (markerHiro.children[0].rotation.z % (Math.PI*2)) < Math.PI){
 			document.getElementById("text").innerHTML = 'red';
 			document.getElementById("text").style.color = 'red';
@@ -191,6 +211,41 @@ function animate() {
 	markerHiro.children[0].rotation.z += theta;
 	
 	renderer.render (scene, camera);	
+	renderer.render(sceneHUD, cameraHUD);
+}
+
+function onDocumentTouchStart(event) {
+	if(event.touches.length == 1){
+		event.preventDefault();
+
+		// NDC: [-1,1]x[-1,1]
+		mouse.x = (event.touches[0].pageX / window.innerWidth) * 2 - 1;
+		mouse.y = -(event.touches[0].pageY / window.innerHeight) * 2 + 1;
+		
+		raycaster.setFromCamera(mouse, camera);
+		var intersects = raycaster.intersectObject(plane);
+	
+		if(intersects.length > 0){
+			var move = intersects[0].point.clone();
+			cyl.position.copy(move);
+		}
+
+	}
+}
+function onDocumentMouseMove(event) {
+	event.preventDefault();
+
+	// NDC: [-1,1]x[-1,1]
+	mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+	mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+	
+	raycaster.setFromCamera(mouse, camera);
+	var intersects = raycaster.intersectObject(plane);
+	
+	if(intersects.length > 0){
+		var move = intersects[0].point.clone();
+		cyl.position.copy(move);
+	}
 }
 
 </script></body>

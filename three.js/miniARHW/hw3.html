@@ -201,7 +201,7 @@ function addMarkerHiro(){
 function animate() {
 	stats.update();
 	requestAnimationFrame (animate);
-	//(R*Math.cos(Math.PI - thetaB)-49.9, 0, -R*Math.sin(Math.PI - thetaB))
+	
 	if( arToolkitSource.ready === false )	return arToolkitContext.update( arToolkitSource.domElement );
 	
 	if(click = false & theta > 0) theta -= 0.1;
@@ -220,12 +220,12 @@ function animate() {
 		}
 		
 	} 
-	markerHiro.children[1].rotation.z += theta;
-	markerHiro.children[1].position.copy(0.25*Math.cos(Math.PI - theta), 0, -0.25*Math.sin(Math.PI - theta));
+	markerHiro.children[1].rotation.y += theta;
+	markerHiro.children[1].position.copy(0.25*Math.cos(theta), 0, -0.25*Math.sin(theta));
+	
 	renderer.clear();
 	renderer.render (scene, camera);
 	button.mesh.material.visible = markerHiro.visible;
-	
 	renderer.render(sceneHUD, cameraHUD);
 }
 
@@ -249,13 +249,6 @@ function onDocumentMouseMove(event) {
 	let y = -(event.clientY / window.innerHeight) * 2 + 1;
 	
 	pickCompute(x, y);
-	/*raycaster.setFromCamera(mouse, camera);
-	var intersects = raycaster.intersectObject(plane);
-	
-	if(intersects.length > 0){
-		var move = intersects[0].point.clone();
-		cyl.position.copy(move);
-	}*/
 }
 
 function pickCompute(ndcX, ndcY){
@@ -263,7 +256,6 @@ function pickCompute(ndcX, ndcY){
 	
 	let dist = button.d2To(HUD_coord);
 	let printStr = [dist.toFixed(2), HUD_coord[0].toFixed(2), HUD_coord[1].toFixed(2)];
-	//document.getElementById("#touch").text(`[${printStr[0]}]:(${printStr[1]}, ${printStr[2]})`);
 	
 	if(dist < button.size){
 		console.log('picked');

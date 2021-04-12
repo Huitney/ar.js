@@ -225,7 +225,7 @@ function animate() {
 	markerHiro.children[1].position.copy(0.25*Math.cos(Math.PI - theta), 0, -0.25*Math.sin(Math.PI - theta));
 	renderer.clear();
 	renderer.render (scene, camera);
-	button.mesh.material.visible = markerHiro.visible;
+	button.mesh.material.visible = markerRoot.visible;
 	renderer.render(sceneHUD, cameraHUD);
 }
 

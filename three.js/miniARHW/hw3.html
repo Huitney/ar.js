@@ -37,7 +37,25 @@ var stats;
 var arToolKitSource, arToolKitContext;
 var markerHiro;
 
-var theta = 0, clickonce = 0, button;
+var theta = 0, click = false, button;
+
+class Button{
+	constructor(cx, cy, size, colorString, map){
+		this.centerX = cx;
+		this.centerY = cy;
+		this.size = size;
+		let material = new THREE.MeshBasicMaterial({color: colorString, transparent: true, opacity:0.7});
+		if(map) material.map = map;
+		this.mesh = new THREE.Mesh(new THREE.CircleGeometry(size, 36), material);
+		this.mesh.position.set(cx, cy, 0);
+	}
+	setLocation(lx, ly){
+		this.mesh.position.set(lx, ly, 0);
+	}
+	d2To(v){
+		return Math.sqrt((v[0]-this.centerX)*(v[0]-this.centerX)+(v[1]-this.centerY)*(v[1]-this.centerY));
+	}
+}
 
 init();
 animate();
@@ -64,9 +82,12 @@ function init() {
 	scene	= new THREE.Scene();
 	renderer.autoClear = false;
 	sceneHUD = new THREE.Scene();
-	// Create a BASIC camera
+	// Create camera
 	camera = new THREE.Camera();
-	cameraHUD = new THREE.OrthographicCamera(-10, 10, 10, -10, -10, 1000);
+	var whRatio = window.innerWidth / window.innerHeight;
+	var halfH = 10;
+	var halfW = whRatio * halfH;
+	cameraHUD = new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, -10, 1000);
 	scene.add(camera);
 
 	////////////////////////////////////////////////////////////////////////////////
@@ -76,19 +97,19 @@ function init() {
 	arToolkitSource = new THREEx.ArToolkitSource({
 		// to read from the webcam 
 		sourceType : 'webcam',
-	})
+	});
 
 	arToolkitSource.init(function onReady(){
-		onResize()
-	})
+		onResize();
+	});
 	
 	// handle resize
 	window.addEventListener('resize', function(){
-		onResize()
-	})
+		onResize();
+	});
 	function onResize(){
-		arToolkitSource.onResize()	
-		arToolkitSource.copySizeTo(renderer.domElement)	
+		arToolkitSource.onResize();
+		arToolkitSource.copySizeTo(renderer.domElement);
 		if( arToolkitContext.arController !== null ){
 			arToolkitSource.copySizeTo(arToolkitContext.arController.canvas)	
 		}	
@@ -112,6 +133,19 @@ function init() {
 
 	markerHiro = addMarkerHiro();
 	scene.add (markerHiro); 
+	
+	//button
+	var loader = new THREE.TextureLoader();
+	loader.setCrossOrigin('');
+
+	loader.load(
+		'https://i.imgur.com/b6I5kb7.png',
+		function(texture) {
+			button = new Button(halfW/2, -halfH/2, halfH/3, 'yellow', texture);
+			sceneHUD.add(button.mesh);
+		},
+	);
+	
 	/*
 	var _iosDevice = !!navigator.platform.match(/iPhone|iPod|iPad/);
 	if(_iosDevice){
@@ -159,46 +193,25 @@ function addMarkerHiro(){
 	
 	var cylinder = new THREE.Mesh( new THREE.CylinderGeometry( 0.01, 0.1, 0.5, 32 ), new THREE.MeshBasicMaterial( {color: 0xffffff} ) );
 	markerRoot.add (cylinder);
-	cylinder.position.z = 0.9;
+	cylinder.position.z = -0.25;
 	cylinder.rotation.x = -Math.PI/2;
 	
-	//button
-	var whRatio = window.innerWidth / window.innerHeight;
-	var halfH = 10;
-	var halfW = whRatio * halfH;
-	var loader = new THREE.TextureLoader();
-	loader.setCrossOrigin('');
-
-	loader.load(
-		'https://i.imgur.com/b6I5kb7.png',
-		function(texture) {
-			var texMat = new THREE.MeshBasicMaterial({
-				map: texture
-			});
-			button = new THREE.Mesh(new THREE.CircleGeometry(halfW / 15, 32), texMat);
-			sceneHUD.add(button);
-			button.position.set(window.innerWidth / 2, window.innerHeight / 2, 0);
-			console.log(button.position);
-		},
-	);
-			
 	return markerRoot;
 }	
 
 function animate() {
-	requestAnimationFrame (animate);
 	stats.update();
+	requestAnimationFrame (animate);
+	//(R*Math.cos(Math.PI - thetaB)-49.9, 0, -R*Math.sin(Math.PI - thetaB))
+	if( arToolkitSource.ready === false )	return arToolkitContext.update( arToolkitSource.domElement );
 	
-	if( arToolkitSource.ready === false )	return
-	arToolkitContext.update( arToolkitSource.domElement )
-	if(clickonce === 2) theta -= 0.01;
+	if(click = false & theta > 0) theta -= 0.1;
 	if(theta <= 0){
-		clickonce = 0;
-		if((markerHiro.children[0].rotation.z % (Math.PI*2)) >= Math.PI/3 & (markerHiro.children[0].rotation.z % (Math.PI*2)) < Math.PI){
+		if((markerHiro.children[1].rotation.z % (Math.PI*2)) >= Math.PI/3 & (markerHiro.children[0].rotation.z % (Math.PI*2)) < Math.PI){
 			document.getElementById("text").innerHTML = 'red';
 			document.getElementById("text").style.color = 'red';
 		}
-		else if((markerHiro.children[0].rotation.z % (Math.PI*2)) < Math.PI/3*5 & (markerHiro.children[0].rotation.z % (Math.PI*2)) >= Math.PI){
+		else if((markerHiro.children[1].rotation.z % (Math.PI*2)) < Math.PI/3*5 & (markerHiro.children[0].rotation.z % (Math.PI*2)) >= Math.PI){
 			document.getElementById("text").innerHTML = 'blue';
 			document.getElementById("text").style.color = 'blue';
 		}
@@ -208,9 +221,12 @@ function animate() {
 		}
 		
 	} 
-	markerHiro.children[0].rotation.z += theta;
-	
-	renderer.render (scene, camera);	
+	markerHiro.children[1].rotation.z += theta;
+	markerHiro.children[1].position.copy(0.25*Math.cos(Math.PI - theta), 0, -0.25*Math.sin(Math.PI - theta));
+	renderer.clear();
+	renderer.render (scene, camera);
+	if(button)
+		button.mesh.material.visible = markerHiro.visible;
 	renderer.render(sceneHUD, cameraHUD);
 }
 
@@ -222,13 +238,7 @@ function onDocumentTouchStart(event) {
 		mouse.x = (event.touches[0].pageX / window.innerWidth) * 2 - 1;
 		mouse.y = -(event.touches[0].pageY / window.innerHeight) * 2 + 1;
 		
-		raycaster.setFromCamera(mouse, camera);
-		var intersects = raycaster.intersectObject(plane);
-	
-		if(intersects.length > 0){
-			var move = intersects[0].point.clone();
-			cyl.position.copy(move);
-		}
+		pickCompute(mouse.x, mouse.y);
 
 	}
 }
@@ -239,12 +249,29 @@ function onDocumentMouseMove(event) {
 	mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
 	mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 	
-	raycaster.setFromCamera(mouse, camera);
+	pickCompute(mouse.x, mouse.y);
+	/*raycaster.setFromCamera(mouse, camera);
 	var intersects = raycaster.intersectObject(plane);
 	
 	if(intersects.length > 0){
 		var move = intersects[0].point.clone();
 		cyl.position.copy(move);
+	}*/
+}
+
+function pickCompute(ndcX, ndcY){
+	let HUD_coord = [halfW*ndcX, halfH*ndcY];
+	
+	let dist = button.d2T0(HUD_coord);
+	let printStr = [dist.toFixed(2), HUD_coord[0].toFixed(2), HUD_coord[1].toFixed(2)];
+	$('#touch').text(`[${printStr[0]}]:(${printStr[1]}, ${printStr[2]})`);
+	
+	if(dist < button.size){
+		console.log('picked');
+		click = true;
+	} else {
+		click = false;
+		console.log('no hit');
 	}
 }
 

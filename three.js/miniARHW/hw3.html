@@ -107,12 +107,28 @@ function init() {
 		onResize();
 	});
 	function onResize(){
-		arToolkitSource.onResize();
-		arToolkitSource.copySizeTo(renderer.domElement);
-		if( arToolkitContext.arController !== null ){
-			arToolkitSource.copySizeTo(arToolkitContext.arController.canvas)	
-		}	
-	}
+        arToolkitSource.onResizeElement()
+    arToolkitSource.copyElementSizeTo(renderer.domElement)
+    if( arToolkitContext.arController !== null ){
+        arToolkitSource.copyElementSizeTo(arToolkitContext.arController.canvas)
+    }
+
+    //$('#ratio').text ('resize: width: ' + window.innerWidth + ' height: ' + window.innerHeight)
+    // use 'ratio' to display down/up
+
+    whRatio = window.innerWidth/window.innerHeight;
+        console.log ('[onResize] width: ' + renderer.domElement.width)
+        console.log ('[onResize] height: ' + renderer.domElement.height)
+        console.log ('[onResize] whRatio: ' + whRatio)
+
+     halfW = halfH * whRatio;
+    cameraHUD.left = -halfW;
+    cameraHUD.right = halfW;
+    cameraHUD.top = halfH;
+    cameraHUD.bottom = -halfH;
+    cameraHUD.updateProjectionMatrix();
+    }
+
 	////////////////////////////////////////////////////////////////////////////////
 	//          initialize arToolkitContext
 	////////////////////////////////////////////////////////////////////////////////

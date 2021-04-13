@@ -1,13 +1,8 @@
 <!DOCTYPE html>
 <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-<style>
-#heading{
-	text-align: center;
-	position:absolute;
-	width:100vw;
-}
-</style>
+
 <!-- three.js library -->
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
 <script src='../examples/vendor/three.js/build/three.min.js'></script>
 <script src="../examples/vendor/three.js/examples/js/libs/stats.min.js"></script>
 <!-- ar.js -->
@@ -18,15 +13,12 @@
 <div style='position: absolute; top: 10px; width:100%; text-align: center; z-index: 1;'>
 <a href="https://github.com/jeromeetienne/AR.js/" target="_blank">AR.js</a>
 	 - three.js<br>
-Minimal Version hw3
-<div id='heading'>
-<p id = "text" style = "color:red"> color </p>
-</div>
+Minimal Version hw3<br><br>
+    <p id="text" style ="color:black ">color</p>
 </div>
 
 <script>
-//https://i.imgur.com/8FQCB3B.png
-//button
+
 
 
 
@@ -41,21 +33,25 @@ var halfH = 10;
 var halfW = whRatio * halfH;
 var theta = 0, click = false, button;
 
-class Button{
-	constructor(cx, cy, size, colorString, map){
-		this.centerX = cx;
+class Button {
+	constructor (cx, cy, size, colorString = 'yellow', map = null){
+		this.centerX = cx;  // HUD-coord
 		this.centerY = cy;
-		this.size = size;
+		this.size = size;  // circle radius
 		let material = new THREE.MeshBasicMaterial({color: colorString, transparent: true, opacity:0.7});
-		if(map) material.map = map;
-		this.mesh = new THREE.Mesh(new THREE.CircleGeometry(size, 36), material);
-		this.mesh.position.set(cx, cy, 0);
+		if (map) 
+		   material.map = map;
+		this.mesh = new THREE.Mesh (new THREE.CircleGeometry (size, 36), material );
+	    this.mesh.position.set (cx, cy, 0);
 	}
-	setLocation(lx, ly){
-		this.mesh.position.set(lx, ly, 0);
+	
+	setLocation (lx, ly) { // 2D-HUD 
+	    this.mesh.position.set (lx, ly, 0);
 	}
-	d2To(v){
-		return Math.sqrt((v[0]-this.centerX)*(v[0]-this.centerX)+(v[1]-this.centerY)*(v[1]-this.centerY));
+	
+	d2To (v) { // 2-norm
+		return Math.sqrt ( (v[0]-this.centerX)*(v[0]-this.centerX) 
+				+ (v[1]-this.centerY)*(v[1]-this.centerY) );
 	}
 }
 
@@ -160,11 +156,11 @@ function init() {
 	cameraHUD.updateProjectionMatrix();	
 	}
 	if (_iOSDevice) {
-    	window.addEventListener('touchstart', onDocumentTouchStart, false);
+    	window.addEventListener('touchstart', onTouchStart, false);
     	// touchend ... use the same callback as mouseup
 	} else {
-		window.addEventListener ('mousedown', onDocumentMouseMove, false);
-		window.addEventListener ('mouseup', onDocumentMouseMove, false);
+		window.addEventListener ('mousedown', onMouseDown, false);
+		window.addEventListener ('mouseup', onMouseUp, false);
     }
     ////////////////////////////////////////////////////////////////////////////////
 	//          initialize arToolkitContext
@@ -220,64 +216,81 @@ function addMarkerHiro(){
 	group.rotation.x -= Math.PI/2;
 	
 	var cylinder = new THREE.Mesh( new THREE.CylinderGeometry( 0.01, 0.1, 0.5, 32 ), new THREE.MeshBasicMaterial( {color: 0xffffff} ) );
-	markerRoot.add (cylinder);
-	cylinder.position.z = -0.25;
+	let pointer = new THREE.Group();
+	pointer.add(cylinder);
+	markerRoot.add (pointer);
+	cylinder.position.set(0, 0.05, -0.25);
 	cylinder.rotation.x = -Math.PI/2;
-	
+	console.log(markerRoot.children[1].position);
 	return markerRoot;
 }	
 
 function animate() {
-	stats.update();
-	requestAnimationFrame (animate);
-	if(markerHiro.children[1]){
-		if( arToolkitSource.ready === false )	return arToolkitContext.update( arToolkitSource.domElement );
-		
-		if(click = false & theta > 0) theta -= 0.1;
-		if(theta <= 0){
-			if((markerHiro.children[1].rotation.z % (Math.PI*2)) >= Math.PI/3 & (markerHiro.children[0].rotation.z % (Math.PI*2)) < Math.PI){
-				document.getElementById("text").innerHTML = 'red';
-				document.getElementById("text").style.color = 'red';
-			}
-			else if((markerHiro.children[1].rotation.z % (Math.PI*2)) < Math.PI/3*5 & (markerHiro.children[0].rotation.z % (Math.PI*2)) >= Math.PI){
-				document.getElementById("text").innerHTML = 'blue';
-				document.getElementById("text").style.color = 'blue';
-			}
-			else {
-				document.getElementById("text").innerHTML = 'green';
-				document.getElementById("text").style.color = 'green';
-			}
-			
-		} 
-		markerHiro.children[1].rotation.y += theta;
-		markerHiro.children[1].position.copy(0.25*Math.cos(theta), 0, -0.25*Math.sin(theta));
-	}
-	renderer.clear();
-	renderer.render (scene, camera);
-	button1.mesh.material.visible = markerHiro.visible;
-	renderer.render(sceneHUD, cameraHUD);
-}
-
-function onDocumentTouchStart(event) {
-	if(event.touches.length == 1){
-		event.preventDefault();
-
-		// NDC: [-1,1]x[-1,1]
-		let x = (event.touches[0].pageX / window.innerWidth) * 2 - 1;
-		let y = -(event.touches[0].pageY / window.innerHeight) * 2 + 1;
-		
-		pickCompute(x, y);
-
-	}
-}
-function onDocumentMouseMove(event) {
-	event.preventDefault();
-
-	// NDC: [-1,1]x[-1,1]
-	let x = (event.clientX / window.innerWidth) * 2 - 1;
-	let y = -(event.clientY / window.innerHeight) * 2 + 1;
 	
-	pickCompute(x, y);
+	requestAnimationFrame (animate);
+	stats.update();
+
+	if( arToolkitSource.ready === false )	return
+	arToolkitContext.update( arToolkitSource.domElement )
+    
+    renderer.clear();
+	renderer.render (scene, camera);
+        
+    button1.mesh.material.visible = markerHiro.visible;
+    
+    renderer.render (sceneHUD, cameraHUD);
+	if(click === true) theta = 1;
+    if(click === false & theta > 0) theta -= 0.1;
+	if(theta <= 0){
+		if((markerHiro.children[1].rotation.y % (Math.PI*2)) >= 0 & (markerHiro.children[1].rotation.y % (Math.PI*2)) < 2*Math.PI/3){
+			document.getElementById("text").innerHTML = 'red';
+			document.getElementById("text").style.color = 'red';
+		}
+		else if((markerHiro.children[1].rotation.y % (Math.PI*2)) >= 2*Math.PI/3 & (markerHiro.children[1].rotation.y % (Math.PI*2)) < 4*Math.PI/3){
+			document.getElementById("text").innerHTML = 'green';
+			document.getElementById("text").style.color = 'green';
+		}
+		else {
+			document.getElementById("text").innerHTML = 'blue';
+			document.getElementById("text").style.color = 'blue';
+		}
+		markerHiro.children[1].position.set(0, 0.05, 0);
+		theta = 0;
+	} else{
+		markerHiro.children[1].position.set(0.25*Math.sin(theta)-0.125, 0.05, 0.25*Math.cos(theta)-0.25);
+	}
+	console.log(markerHiro.children[1].rotation.y % (Math.PI*2), Math.PI*2);
+	markerHiro.children[1].rotation.y += theta;
+}
+
+function onMouseUp (event) {
+	// do nothing yet ...
+	click = false;
+}
+
+function onMouseDown (event) {
+	console.log ('in mouse down')
+	event.preventDefault();
+	let ndcX = (event.clientX / window.innerWidth) * 2 - 1;
+	let ndcY = -(event.clientY / window.innerHeight) * 2 + 1;
+
+	pickCompute (ndcX, ndcY);	
+	
+	click = true;
+}	
+
+function onTouchStart (event) {
+	console.log ('in touch start')
+
+   if (event.touches.length == 1) {
+        
+		event.preventDefault();
+		let ndcX = ( event.touches[0].pageX / window.innerWidth ) * 2 - 1;
+		let ndcY = - ( event.touches[0].pageY / window.innerHeight ) * 2 + 1;
+	
+		pickCompute (ndcX, ndcY);		
+		
+	}	
 }
 
 function pickCompute(ndcX, ndcY){
@@ -286,11 +299,9 @@ function pickCompute(ndcX, ndcY){
 	let dist = button1.d2To(HUD_coord);
 	let printStr = [dist.toFixed(2), HUD_coord[0].toFixed(2), HUD_coord[1].toFixed(2)];
 	
-	if(dist < button1.size){
+	if(dist <= button1.size){
 		console.log('picked');
-		click = true;
 	} else {
-		click = false;
 		console.log('no hit');
 	}
 }

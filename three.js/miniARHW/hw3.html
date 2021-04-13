@@ -221,7 +221,6 @@ function addMarkerHiro(){
 	markerRoot.add (pointer);
 	cylinder.position.set(0, 0.05, -0.25);
 	cylinder.rotation.x = -Math.PI/2;
-	console.log(markerRoot.children[1].position);
 	return markerRoot;
 }	
 
@@ -254,12 +253,8 @@ function animate() {
 			document.getElementById("text").innerHTML = 'blue';
 			document.getElementById("text").style.color = 'blue';
 		}
-		markerHiro.children[1].position.set(0, 0.05, 0);
 		theta = 0;
-	} else{
-		markerHiro.children[1].position.set(0.25*Math.sin(theta)-0.125, 0.05, 0.25*Math.cos(theta)-0.25);
-	}
-	console.log(markerHiro.children[1].rotation.y % (Math.PI*2), Math.PI*2);
+	} 
 	markerHiro.children[1].rotation.y += theta;
 }
 
@@ -276,7 +271,7 @@ function onMouseDown (event) {
 
 	pickCompute (ndcX, ndcY);	
 	
-	click = true;
+	
 }	
 
 function onTouchStart (event) {
@@ -301,6 +296,7 @@ function pickCompute(ndcX, ndcY){
 	
 	if(dist <= button1.size){
 		console.log('picked');
+		click = true;
 	} else {
 		console.log('no hit');
 	}

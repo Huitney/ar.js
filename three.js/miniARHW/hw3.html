@@ -82,7 +82,7 @@ function init() {
     
 	stats = new Stats();
 	document.body.appendChild( stats.dom );
-
+	
 	// init scene and camera
 	scene	= new THREE.Scene();
 	
@@ -96,7 +96,12 @@ function init() {
 	halfW = halfH * whRatio;
 	
 	cameraHUD = new THREE.OrthographicCamera (-halfW,halfW, halfH,-halfH, -10,10);
-   
+	
+	//light
+	var light = new THREE.PointLight( 0xffffff, 1);
+	light.position.set(0, 5, 0);
+	scene.add( light );
+	
     ///////////////////////////////////////////////////////
 	
 	let loader = new THREE.TextureLoader();
@@ -215,7 +220,7 @@ function addMarkerHiro(){
 	markerRoot.add (group);
 	group.rotation.x -= Math.PI/2;
 	
-	var cylinder = new THREE.Mesh( new THREE.CylinderGeometry( 0.01, 0.1, 0.5, 32 ), new THREE.MeshBasicMaterial( {color: 0xffffff} ) );
+	var cylinder = new THREE.Mesh( new THREE.CylinderGeometry( 0.01, 0.1, 0.5, 32 ), new THREE.MeshPhongMaterial( {color: 0xe0f404} ) );
 	let pointer = new THREE.Group();
 	pointer.add(cylinder);
 	markerRoot.add (pointer);
@@ -238,7 +243,10 @@ function animate() {
     button1.mesh.material.visible = markerHiro.visible;
     
     renderer.render (sceneHUD, cameraHUD);
-	if(click === true) theta = 1;
+	if(click === true){
+		if(theta <= 1) theta += 0.05;
+		else theta = 1;
+	} 
     if(click === false & theta > 0) theta -= 0.1;
 	if(theta <= 0){
 		if((markerHiro.children[1].rotation.y % (Math.PI*2)) >= 0 & (markerHiro.children[1].rotation.y % (Math.PI*2)) < 2*Math.PI/3){

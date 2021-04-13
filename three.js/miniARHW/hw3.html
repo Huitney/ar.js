@@ -157,7 +157,7 @@ function init() {
 	}
 	if (_iOSDevice) {
     	window.addEventListener('touchstart', onTouchStart, false);
-    	// touchend ... use the same callback as mouseup
+		window.addEventListener('touchend', onTouchEnd, false);
 	} else {
 		window.addEventListener ('mousedown', onMouseDown, false);
 		window.addEventListener ('mouseup', onMouseUp, false);
@@ -263,6 +263,11 @@ function onMouseUp (event) {
 	click = false;
 }
 
+function onTouchEnd (event) {
+	// do nothing yet ...
+	click = false;
+}
+
 function onMouseDown (event) {
 	console.log ('in mouse down')
 	event.preventDefault();
@@ -277,7 +282,7 @@ function onMouseDown (event) {
 function onTouchStart (event) {
 	console.log ('in touch start')
 
-   //if (event.touches.length == 1) {
+   if (event.touches.length == 1) {
         
 		event.preventDefault();
 		let ndcX = ( event.touches[0].pageX / window.innerWidth ) * 2 - 1;
@@ -285,7 +290,7 @@ function onTouchStart (event) {
 	
 		pickCompute (ndcX, ndcY);		
 		
-	//}	
+	}	
 }
 
 function pickCompute(ndcX, ndcY){

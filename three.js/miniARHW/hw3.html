@@ -277,7 +277,7 @@ function onMouseDown (event) {
 function onTouchStart (event) {
 	console.log ('in touch start')
 
-   if (event.touches.length == 1) {
+   //if (event.touches.length == 1) {
         
 		event.preventDefault();
 		let ndcX = ( event.touches[0].pageX / window.innerWidth ) * 2 - 1;
@@ -285,7 +285,7 @@ function onTouchStart (event) {
 	
 		pickCompute (ndcX, ndcY);		
 		
-	}	
+	//}	
 }
 
 function pickCompute(ndcX, ndcY){

@@ -64,6 +64,7 @@ animate();
 
 function init() {
 
+	let _iOSDevice = !!navigator.platform.match(/iPhone|iPod|iPad/);
 	// init renderer
 	renderer	= new THREE.WebGLRenderer({
 		// antialias	: true,
@@ -77,59 +78,95 @@ function init() {
 	renderer.domElement.style.left = '0px'
 	document.body.appendChild( renderer.domElement );
 
+    // for multi-pass rendering
+	renderer.autoClear = false;
+
+	// width/height ratio
+	whRatio = window.innerWidth/window.innerHeight;
+    
 	stats = new Stats();
 	document.body.appendChild( stats.dom );
 
 	// init scene and camera
 	scene	= new THREE.Scene();
-	renderer.autoClear = false;
-	sceneHUD = new THREE.Scene();
-	// Create camera
+	
+	// Create a BASIC camera
 	camera = new THREE.Camera();
-	cameraHUD = new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, -10, 1000);
 	scene.add(camera);
 
-	////////////////////////////////////////////////////////////////////////////////
+	sceneHUD = new THREE.Scene();
+	
+	halfH = 10;
+	halfW = halfH * whRatio;
+	
+	cameraHUD = new THREE.OrthographicCamera (-halfW,halfW, halfH,-halfH, -10,10);
+   
+    ///////////////////////////////////////////////////////
+	
+	let loader = new THREE.TextureLoader();
+	loader.setCrossOrigin(''); // 重要！
+	loader.load(
+    	// resource URL
+    	'https://i.imgur.com/8FQCB3B.png',
+
+    	// Function when resource is loaded
+    	function(texture) {
+      		console.log ('texture loaded ...')
+			// texture load完，再建button
+			var buttonSize = halfH/3; // radius
+			button1 = new Button (halfW/2, -halfH/2, buttonSize, 'white', texture); 
+			sceneHUD.add (button1.mesh);
+    	},
+
+  	);
+  	
+    ////////////////////////////////////////////////////////////////////////////////
 	//          handle arToolkitSource
 	////////////////////////////////////////////////////////////////////////////////
 
 	arToolkitSource = new THREEx.ArToolkitSource({
 		// to read from the webcam 
 		sourceType : 'webcam',
-	});
+	})
 
 	arToolkitSource.init(function onReady(){
-		onResize();
-	});
+		onResize()
+	})
 	
 	// handle resize
 	window.addEventListener('resize', function(){
-		onResize();
-	});
+		onResize()
+	})
 	function onResize(){
-        arToolkitSource.onResizeElement()
-    arToolkitSource.copyElementSizeTo(renderer.domElement)
-    if( arToolkitContext.arController !== null ){
-        arToolkitSource.copyElementSizeTo(arToolkitContext.arController.canvas)
+		arToolkitSource.onResizeElement()	
+	arToolkitSource.copyElementSizeTo(renderer.domElement)	
+	if( arToolkitContext.arController !== null ){
+		arToolkitSource.copyElementSizeTo(arToolkitContext.arController.canvas)	
+	}	
+	
+	//$('#ratio').text ('resize: width: ' + window.innerWidth + ' height: ' + window.innerHeight)
+	// use 'ratio' to display down/up
+	
+	whRatio = window.innerWidth/window.innerHeight;
+		console.log ('[onResize] width: ' + renderer.domElement.width)	
+		console.log ('[onResize] height: ' + renderer.domElement.height)	
+		console.log ('[onResize] whRatio: ' + whRatio)	
+	
+	 halfW = halfH * whRatio;
+	cameraHUD.left = -halfW;
+	cameraHUD.right = halfW;
+	cameraHUD.top = halfH;
+	cameraHUD.bottom = -halfH;
+	cameraHUD.updateProjectionMatrix();	
+	}
+	if (_iOSDevice) {
+    	window.addEventListener('touchstart', onDocumentTouchStart, false);
+    	// touchend ... use the same callback as mouseup
+	} else {
+		window.addEventListener ('mousedown', onDocumentMouseMove, false);
+		window.addEventListener ('mouseup', onDocumentMouseMove, false);
     }
-
-    //$('#ratio').text ('resize: width: ' + window.innerWidth + ' height: ' + window.innerHeight)
-    // use 'ratio' to display down/up
-
-    whRatio = window.innerWidth/window.innerHeight;
-        console.log ('[onResize] width: ' + renderer.domElement.width)
-        console.log ('[onResize] height: ' + renderer.domElement.height)
-        console.log ('[onResize] whRatio: ' + whRatio)
-
-     halfW = halfH * whRatio;
-    cameraHUD.left = -halfW;
-    cameraHUD.right = halfW;
-    cameraHUD.top = halfH;
-    cameraHUD.bottom = -halfH;
-    cameraHUD.updateProjectionMatrix();
-    }
-
-	////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
 	//          initialize arToolkitContext
 	////////////////////////////////////////////////////////////////////////////////
 	
@@ -147,31 +184,7 @@ function init() {
 	})
 
 	markerHiro = addMarkerHiro();
-	scene.add (markerHiro); 
-	
-	//button
-	var loader = new THREE.TextureLoader();
-	loader.setCrossOrigin('');
-
-	loader.load(
-		'https://i.imgur.com/b6I5kb7.png',
-		function(texture) {
-			button = new Button(halfW/2, -halfH/2, halfH/3, 'yellow', texture);
-			sceneHUD.add(button.mesh);
-		},
-	);
-	
-	
-	var _iosDevice = !!navigator.platform.match(/iPhone|iPod|iPad/);
-	if(_iosDevice){
-		//document.getElementById("#iOSdevice").text('use iPhone|iPad');
-		document.addEventListener('touchstart', onDocumentTouchStart, false);
-		document.addEventListener('touchmove', onDocumentTouchStart, false);
-	}else{
-		//document.getElementById("#iOSdevice").text('regolar');
-		document.addEventListener('mousemove', onDocumentMouseMove, false);
-	}
-	//window.addEventListener('touchstart', onDocumentTouchStart, false);
+	scene.add (markerHiro);
 }
 	
 function addMarkerHiro(){
@@ -217,31 +230,31 @@ function addMarkerHiro(){
 function animate() {
 	stats.update();
 	requestAnimationFrame (animate);
-	
-	if( arToolkitSource.ready === false )	return arToolkitContext.update( arToolkitSource.domElement );
-	
-	if(click = false & theta > 0) theta -= 0.1;
-	if(theta <= 0){
-		if((markerHiro.children[1].rotation.z % (Math.PI*2)) >= Math.PI/3 & (markerHiro.children[0].rotation.z % (Math.PI*2)) < Math.PI){
-			document.getElementById("text").innerHTML = 'red';
-			document.getElementById("text").style.color = 'red';
-		}
-		else if((markerHiro.children[1].rotation.z % (Math.PI*2)) < Math.PI/3*5 & (markerHiro.children[0].rotation.z % (Math.PI*2)) >= Math.PI){
-			document.getElementById("text").innerHTML = 'blue';
-			document.getElementById("text").style.color = 'blue';
-		}
-		else {
-			document.getElementById("text").innerHTML = 'green';
-			document.getElementById("text").style.color = 'green';
-		}
+	if(markerHiro.children[1]){
+		if( arToolkitSource.ready === false )	return arToolkitContext.update( arToolkitSource.domElement );
 		
-	} 
-	markerHiro.children[1].rotation.y += theta;
-	markerHiro.children[1].position.copy(0.25*Math.cos(theta), 0, -0.25*Math.sin(theta));
-	
+		if(click = false & theta > 0) theta -= 0.1;
+		if(theta <= 0){
+			if((markerHiro.children[1].rotation.z % (Math.PI*2)) >= Math.PI/3 & (markerHiro.children[0].rotation.z % (Math.PI*2)) < Math.PI){
+				document.getElementById("text").innerHTML = 'red';
+				document.getElementById("text").style.color = 'red';
+			}
+			else if((markerHiro.children[1].rotation.z % (Math.PI*2)) < Math.PI/3*5 & (markerHiro.children[0].rotation.z % (Math.PI*2)) >= Math.PI){
+				document.getElementById("text").innerHTML = 'blue';
+				document.getElementById("text").style.color = 'blue';
+			}
+			else {
+				document.getElementById("text").innerHTML = 'green';
+				document.getElementById("text").style.color = 'green';
+			}
+			
+		} 
+		markerHiro.children[1].rotation.y += theta;
+		markerHiro.children[1].position.copy(0.25*Math.cos(theta), 0, -0.25*Math.sin(theta));
+	}
 	renderer.clear();
 	renderer.render (scene, camera);
-	button.mesh.material.visible = markerHiro.visible;
+	button1.mesh.material.visible = markerHiro.visible;
 	renderer.render(sceneHUD, cameraHUD);
 }
 
@@ -270,10 +283,10 @@ function onDocumentMouseMove(event) {
 function pickCompute(ndcX, ndcY){
 	let HUD_coord = [halfW*ndcX, halfH*ndcY];
 	
-	let dist = button.d2To(HUD_coord);
+	let dist = button1.d2To(HUD_coord);
 	let printStr = [dist.toFixed(2), HUD_coord[0].toFixed(2), HUD_coord[1].toFixed(2)];
 	
-	if(dist < button.size){
+	if(dist < button1.size){
 		console.log('picked');
 		click = true;
 	} else {

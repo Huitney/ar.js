@@ -1,31 +1,70 @@
+  
 <!DOCTYPE html>
+<html>
+<head>
 <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 
 <!-- three.js library -->
 <script src='../examples/vendor/three.js/build/three.min.js'></script>
 <script src="../examples/vendor/three.js/examples/js/libs/stats.min.js"></script>
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
 <script src="https://jyunming-chen.github.io/tutsplus/js/KeyboardState.js"></script>
+<script src="https://threejs.org/build/three.min.js"></script>
+
+
+<body style='margin : 0px; overflow: hidden; font-family: Monospace;'>
 
 <!-- ar.js -->
 <script src="../build/ar.js"></script>
 <script>THREEx.ArToolkitContext.baseURL = '../'</script>
 
-<body style='margin : 0px; overflow: hidden; font-family: Monospace;'>
-<div style='position: absolute; top: 10px; width:100%; text-align: center; z-index: 1;'>
-<a href="https://github.com/jeromeetienne/AR.js/" target="_blank">AR.js</a>
-	 - three.js<br>
-Minimal Version
-</div>
+<style>
+#heading {
+    position : absolute;
+    text-align : center;
+    width : 100vw;
+    bottom : 80vh;
+	z-index: 1;
+}
+
+</style>
+</head>
+<body> 
 
 <script>
 
-// global variables
-var renderer, scene, camera;
-var stats;
-var arToolKitSource, arToolKitContext;
-var markerHiro;
+class Button {
+	constructor (cx, cy, size, colorString = 'yellow', map = null){
+		this.centerX = cx;  // HUD-coord
+		this.centerY = cy;
+		this.size = size;  // circle radius
+		let material = new THREE.MeshBasicMaterial({color: colorString, transparent: true, opacity:0.7});
+		if (map) 
+		   material.map = map;
+		this.mesh = new THREE.Mesh (new THREE.CircleGeometry (size, 36), material );
+	    this.mesh.position.set (cx, cy, 0);
+	}
+	
+	setLocation (lx, ly) { // 2D-HUD 
+	    this.mesh.position.set (lx, ly, 0);
+	}
+	
+	d2To (v) { // 2-norm
+		return Math.sqrt ( (v[0]-this.centerX)*(v[0]-this.centerX) 
+				+ (v[1]-this.centerY)*(v[1]-this.centerY) );
+	}
+}
 
-var uvOffsetArray = [], sprite, first = true;
+var renderer, stats;
+var scene, camera, sceneHUD, cameraHUD;
+var markerHiro;
+var arToolkitSource, arToolkitContext;
+var whRatio, halfW, halfH;
+var button;
+var _iOSDevice;
+
+var uvOffsetArray = [];
 var keyboard = new KeyboardState();
 
 init();
@@ -33,29 +72,65 @@ animate();
 
 function init() {
 
-	// init renderer
+	let _iOSDevice = !!navigator.platform.match(/iPhone|iPod|iPad/);
+
+	console.log ('iOS: ' + _iOSDevice)
+	
 	renderer	= new THREE.WebGLRenderer({
 		// antialias	: true,
 		alpha: true
 	});
 	renderer.setClearColor(new THREE.Color('lightgrey'), 0)
-	// renderer.setPixelRatio( 1/2 );
+    
 	renderer.setSize( window.innerWidth, window.innerHeight );
 	renderer.domElement.style.position = 'absolute'
 	renderer.domElement.style.top = '0px'
 	renderer.domElement.style.left = '0px'
 	document.body.appendChild( renderer.domElement );
+	
+	// for multi-pass rendering
+	renderer.autoClear = false;
 
-	stats = new Stats();
-	document.body.appendChild( stats.dom );
+	// width/height ratio
+	whRatio = window.innerWidth/window.innerHeight;
+		console.log ('[onInit] width: ' + window.innerWidth)	
+		console.log ('[onInit] height: ' + window.innerHeight)	
 
 	// init scene and camera
 	scene	= new THREE.Scene();
-	
-	// Create a BASIC camera
-	camera = new THREE.Camera();
+	// Create a camera
+	camera = new THREE.PerspectiveCamera(50,window.innerWidth/window.innerHeight,1,100);
 	scene.add(camera);
 
+	//camera.position.set(0,25,200);
+	// for HUD scene
+	sceneHUD = new THREE.Scene();
+	
+	halfH = 10;
+	halfW = halfH * whRatio;
+	
+	cameraHUD = new THREE.OrthographicCamera (-halfW,halfW, halfH,-halfH, -10,10);
+
+	///////////////////////////////////////////////////////
+	
+	let loader = new THREE.TextureLoader();
+	loader.setCrossOrigin(''); 
+	loader.load(
+    	// resource URL
+    	'https://i.imgur.com/8FQCB3B.png',
+
+    	// Function when resource is loaded
+    	function(texture) {
+      		console.log ('texture loaded ...')
+			var buttonSize = halfH/3; // radius
+			button = new Button (halfW/2, -halfH/2, buttonSize, 'white', texture); //position
+			sceneHUD.add (button.mesh);
+    	},
+
+  	);
+
+
+	
 	////////////////////////////////////////////////////////////////////////////////
 	//          handle arToolkitSource
 	////////////////////////////////////////////////////////////////////////////////
@@ -63,96 +138,158 @@ function init() {
 	arToolkitSource = new THREEx.ArToolkitSource({
 		// to read from the webcam 
 		sourceType : 'webcam',
-	});
+
+		// to read from an image
+		// sourceType : 'image',
+		// sourceUrl : THREEx.ArToolkitContext.baseURL + '../data/images/img.jpg',		
+
+		// to read from a video
+		// sourceType : 'video',
+		// sourceUrl : THREEx.ArToolkitContext.baseURL + '../data/videos/headtracking.mp4',		
+	})
 
 	arToolkitSource.init(function onReady(){
 		onResize();
-	});
-	
-	// handle resize
-	window.addEventListener('resize', function(){
-		onResize();
 	})
-	function onResize(){
-		arToolkitSource.onResize();	
-		arToolkitSource.copySizeTo(renderer.domElement);
-		if( arToolkitContext.arController !== null ){
-			arToolkitSource.copySizeTo(arToolkitContext.arController.canvas);	
-		}	
-	}
+	
 	////////////////////////////////////////////////////////////////////////////////
 	//          initialize arToolkitContext
 	////////////////////////////////////////////////////////////////////////////////
 	
+	// create atToolkitContext
 	arToolkitContext = new THREEx.ArToolkitContext({
 		cameraParametersUrl: THREEx.ArToolkitContext.baseURL + '../data/data/camera_para.dat',
 		detectionMode: 'mono',
 		maxDetectionRate: 30,
 		canvasWidth: 80*3,
 		canvasHeight: 60*3,
-	});
+	})
 	// initialize it
 	arToolkitContext.init(function onCompleted(){
 		// copy projection matrix to camera
 		camera.projectionMatrix.copy( arToolkitContext.getProjectionMatrix() );
-	});
-
-	markerHiro = addMarkerHiro();
-	markerBomb = addMarkerBomb();
-	scene.add (markerHiro, markerBomb); 
-	
-	//explosion
-	var loader = new THREE.TextureLoader();
-	loader.crossOrigin = '';
-	setUpOffsetArray();
-	loader.load(
-	'https://i.imgur.com/eknrr9t.png',
-
-	function(texture) {
-		var texMat = new THREE.MeshBasicMaterial({
-			map: texture,
-			transparent: true, // cutout texture: set transparent: true
-			side: THREE.DoubleSide
-		});
-		texture.wrapS = THREE.RepeatWrapping;
-		texture.wrapT = THREE.RepeatWrapping;
-		buildSprite(texMat);
-	},
-	function(xhr) {
-		console.log((xhr.loaded / xhr.total * 100) + '% loaded');
-	},
-	function(xhr) {
-		console.log('An error happened');
-	}
-	);
-	
-	
-}
-	
-function addMarkerHiro(){
-	let markerRoot = new THREE.Group();
-
-	var artoolkitMarker = new THREEx.ArMarkerControls(arToolkitContext, markerRoot, {
-		type : 'pattern',
-		patternUrl : THREEx.ArToolkitContext.baseURL + '../data/data/patt.hiro'
 	})
 	
-	var grid = new THREE.GridHelper (1, 10, 'red', 'white');
-	markerRoot.add (grid);
+	////////////////////////////////////////////////////////////////////////////////
+	//          Create a ArMarkerControls
+	////////////////////////////////////////////////////////////////////////////////
+	markerHiro = addMarkerHiro();
+	scene.add(markerHiro);
 	
-	return markerRoot;
-}	
+	let localCamera = markerHiro.worldToLocal(new THREE.Vector3(0,0,0));	
+	let point = new THREE.Vector3(0,0,1);
+	let angle = point.angleTo(localCamera);
+	let axis = new THREE.Vector3();
+	axis.crossVectors(point,localCamera).normalize();
+	markerHiro.quaternion.setFromAxisAngle(axis,angle);
+	
+	//////////////////////////////////////////////////////////////////////////////////
+	//		render the whole thing on the page
+	//////////////////////////////////////////////////////////////////////////////////
+	stats = new Stats();
+	document.body.appendChild( stats.dom );
+	
+	// handle resize: can be iPAD change orientation
+	window.addEventListener('resize', function(){
+		onResize();
+	})
+	
+	if (_iOSDevice) {
+    	window.addEventListener('touchstart', onTouchStart, false);
+	} else {
+		window.addEventListener ('mousedown', onMouseDown, false);
 
-function addMarkerBomb(){
+    }
+	
+	//////////////////
+	
+
+}
+
+function setUpOffsetArray() {
+	var rowCount = 4; // 4x8 sprites
+	var colCount = 8;
+	for (var i = 0; i < rowCount; i++) {
+		var row = [];
+		for (var j = 0; j < colCount; j++)
+		row.push(new THREE.Vector2(j * 0.125, - 0.25 * i));
+		uvOffsetArray.push(row);
+  }	
+}
+
+function buildSprite(texMat) {
+
+	let points = [];
+	points.push(
+		new THREE.Vector3(-1.5, -1.5, 0),
+		new THREE.Vector3(1.5, -1.5, 0),
+		new THREE.Vector3(1.5, 1.5, 0),
+		new THREE.Vector3(-1.5, 1.5, 0)
+	);
+	var geometry = new THREE.BufferGeometry().setFromPoints(points);
+
+	let indices = [0,1,2, 0,2,3];
+	geometry.setIndex(indices);
+
+	let uvs = []
+	uvs.push (0,0.75, 0.125,0.75, 0.125,1, 0,1);
+	geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+
+	geometry.computeBoundingSphere();
+	geometry.computeFaceNormals();
+	geometry.computeVertexNormals();
+
+	sprite = new THREE.Mesh(geometry, texMat);
+	sprite.position.z +=0.01;
+	return sprite;
+}
+
+function addMarkerHiro() {
+	
 	let markerRoot = new THREE.Group();
-
 	var artoolkitMarker = new THREEx.ArMarkerControls(arToolkitContext, markerRoot, {
 		type : 'pattern',
 		patternUrl : THREEx.ArToolkitContext.baseURL + '../data/data/bomb.patt'
-	})
+	});
+	let loader2 = new THREE.TextureLoader();
+	loader2.setCrossOrigin('');
+	loader2.load(
+    	'https://i.imgur.com/Lue54nD.png',
+    	function(texture) {
+      		console.log ('texture loaded ...')
+			var texMat = new THREE.MeshBasicMaterial({
+				map: texture,
+				transparent: true, 
+				side: THREE.DoubleSide
+			});			
+			var mesh = new THREE.Mesh (new THREE.CircleGeometry (0.55, 36), texMat );
+			
+			markerRoot.add(mesh);
+    	},
+  	);
 	
+	setUpOffsetArray();
+
+	var loader3 = new THREE.TextureLoader();
+
+	loader3.load(
+		'https://i.imgur.com/eknrr9t.png',
+
+		function(texture) {
+		  var texMat = new THREE.MeshBasicMaterial({
+			map: texture,
+			transparent: true, // cutout texture: set transparent: true
+			side: THREE.DoubleSide,
+		  });
+		  texture.wrapS = THREE.RepeatWrapping;
+		  texture.wrapT = THREE.RepeatWrapping;
+		  markerRoot.add(buildSprite(texMat));
+		},
+	);
+		
+
 	return markerRoot;
-}	
+}
 
 function explosionAnimate(ex, baseS, baseT){
 	
@@ -165,67 +302,89 @@ function explosionAnimate(ex, baseS, baseT){
 		baseS %= 4;
 	}
 	if(ex.visible)
-		setTimeout (explosionAnimate(ex, baseS, (baseT + 1) % 8), 100000);
-	console.log(sprite.visible);
-}
-
-function setUpOffsetArray() {
-	var rowCount = 4; // 4x8 sprites
-	var colCount = 8;
-	for (var i = 0; i < rowCount; i++) {
-		var row = [];
-		for (var j = 0; j < colCount; j++)
-		row.push(new THREE.Vector2(j * 0.125, - 0.25 * i));
-		uvOffsetArray.push(row);
-	}
-}
-
-function buildSprite(texMat) {
-
-	var geometry = new THREE.Geometry();
-	geometry.vertices.push(
-		new THREE.Vector3(-15, -15, 0),
-		new THREE.Vector3(15, -15, 0),
-		new THREE.Vector3(15, 15, 0),
-		new THREE.Vector3(-15, 15, 0)
-	);
-
-	var face;
-	face = new THREE.Face3(0, 1, 2);
-	geometry.faces.push(face);
-	face = new THREE.Face3(0, 2, 3);
-	geometry.faces.push(face);
+		setTimeout (explosionAnimate(ex, baseS, (baseT + 1) % 8), 200);
 	
-	var uv0 = new THREE.Vector2(0,0);
-	var uv1 = new THREE.Vector2(1,0);
-	var uv2 = new THREE.Vector2(1,1);
-	var uv3 = new THREE.Vector2(0,1);
-
-	geometry.faceVertexUvs[0].push([uv0, uv1, uv2]);
-	geometry.faceVertexUvs[0].push([uv0, uv2, uv3]);
-
-	geometry.computeBoundingSphere();
-	geometry.computeFaceNormals();
-	geometry.computeVertexNormals();
-
-	sprite = new THREE.Mesh(geometry, texMat);
-
 }
 
 function animate() {
-	requestAnimationFrame (animate);
-	stats.update();
-	keyboard.update();
-	if( arToolkitSource.ready === false )	return
-	arToolkitContext.update( arToolkitSource.domElement )
 	
-	if(keyboard.down('space')){
-		markerHiro.add(sprite);
-		sprite.material.map.offset.copy (uvOffsetArray[0][0]);
-		explosionAnimate(sprite, 0, 1);
-		first = false;
+	
+	stats.update();
+	requestAnimationFrame (animate);
+	
+	if( arToolkitSource.ready === false ) return;
+	arToolkitContext.update( arToolkitSource.domElement )
+
+	renderer.clear();
+	renderer.render (scene, camera);
+	
+	button.mesh.material.visible = markerHiro.visible;
+	
+	renderer.render (sceneHUD, cameraHUD);
 		
-	}
+}
+	
+function onResize(){
+	arToolkitSource.onResizeElement();	
+	arToolkitSource.copyElementSizeTo(renderer.domElement);
+	if( arToolkitContext.arController !== null ){
+		arToolkitSource.copyElementSizeTo(arToolkitContext.arController.canvas)	
+	}	
+	
+	whRatio = window.innerWidth/window.innerHeight;
+		console.log ('[onResize] width: ' + renderer.domElement.width)	
+		console.log ('[onResize] height: ' + renderer.domElement.height)	
+		console.log ('[onResize] whRatio: ' + whRatio)	
+	
+	halfW = halfH * whRatio;
+	cameraHUD.left = -halfW;
+	cameraHUD.right = halfW;
+	cameraHUD.top = halfH;
+	cameraHUD.bottom = -halfH;
+	cameraHUD.updateProjectionMatrix();
+
+}
+	
+function onMouseDown (event) {
+	console.log ('in mouse down')
+	event.preventDefault();
+	let ndcX = (event.clientX / window.innerWidth) * 2 - 1;
+	let ndcY = -(event.clientY / window.innerHeight) * 2 + 1;
+
+	pickCompute (ndcX, ndcY);	
+	
+	
+}	
+
+function onTouchStart (event) {
+	console.log ('in touch start')
+
+   if (event.touches.length == 1) {
+        
+		event.preventDefault();
+		let ndcX = ( event.touches[0].pageX / window.innerWidth ) * 2 - 1;
+		let ndcY = - ( event.touches[0].pageY / window.innerHeight ) * 2 + 1;
+	
+		pickCompute (ndcX, ndcY);		
+		
+	}	
 }
 
-</script></body>
+function pickCompute(ndcX, ndcY){
+	let HUD_coord = [halfW*ndcX, halfH*ndcY];
+	
+	let dist = button1.d2To(HUD_coord);
+	let printStr = [dist.toFixed(2), HUD_coord[0].toFixed(2), HUD_coord[1].toFixed(2)];
+	
+	if(dist <= button.size){
+		console.log('picked');
+		explosionAnimate(markerHiro[1], 0, 0);
+	} else {
+		console.log('no hit');
+	}
+}	
+
+
+</script>
+</body>
+</html>

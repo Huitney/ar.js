@@ -35,7 +35,7 @@
 <script>
 
 class Button {
-	constructor (cx, cy, size, colorString = 'yellow', map = null){
+	constructor (cx, cy, size, colorString = 'yellow', map){
 		this.centerX = cx;  // HUD-coord
 		this.centerY = cy;
 		this.size = size;  // circle radius
@@ -64,7 +64,7 @@ var whRatio, halfW, halfH;
 var button;
 var _iOSDevice;
 
-var uvOffsetArray = [];
+var uvOffsetArray = [], explo = false;
 var keyboard = new KeyboardState();
 
 init();
@@ -239,7 +239,7 @@ function buildSprite(texMat) {
 	geometry.computeFaceNormals();
 	geometry.computeVertexNormals();
 
-	sprite = new THREE.Mesh(geometry, texMat);
+	let sprite = new THREE.Mesh(geometry, texMat);
 	sprite.position.z +=0.01;
 	return sprite;
 }
@@ -262,8 +262,9 @@ function addMarkerHiro() {
 				transparent: true, 
 				side: THREE.DoubleSide
 			});			
-			var mesh = new THREE.Mesh (new THREE.CircleGeometry (0.55, 36), texMat );
-			
+			var mesh = new THREE.Mesh (new THREE.CircleGeometry (1, 36), texMat );
+			mesh.rotation.x = Math.PI/2;
+			mesh.position.y = 0.5;
 			markerRoot.add(mesh);
     	},
   	);
@@ -296,13 +297,13 @@ function explosionAnimate(ex, baseS, baseT){
 	ex.material.map.offset.copy (uvOffsetArray[baseS][baseT]);  
 	if (baseT === 0) {
 		if(baseS === 3){
-			ex.visible = false;
+			explo = false;
 		}
 		baseS++;
 		baseS %= 4;
 	}
-	if(ex.visible)
-		setTimeout (explosionAnimate(ex, baseS, (baseT + 1) % 8), 200);
+	if(explo)
+		setTimeout (explosionAnimate(ex, baseS, (baseT + 1) % 8), 1000);
 	
 }
 
@@ -346,7 +347,6 @@ function onResize(){
 }
 	
 function onMouseDown (event) {
-	console.log ('in mouse down')
 	event.preventDefault();
 	let ndcX = (event.clientX / window.innerWidth) * 2 - 1;
 	let ndcY = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -357,8 +357,6 @@ function onMouseDown (event) {
 }	
 
 function onTouchStart (event) {
-	console.log ('in touch start')
-
    if (event.touches.length == 1) {
         
 		event.preventDefault();
@@ -373,11 +371,12 @@ function onTouchStart (event) {
 function pickCompute(ndcX, ndcY){
 	let HUD_coord = [halfW*ndcX, halfH*ndcY];
 	
-	let dist = button1.d2To(HUD_coord);
+	let dist = button.d2To(HUD_coord);
 	let printStr = [dist.toFixed(2), HUD_coord[0].toFixed(2), HUD_coord[1].toFixed(2)];
 	
 	if(dist <= button.size){
 		console.log('picked');
+		explo = true;
 		explosionAnimate(markerHiro[1], 0, 0);
 	} else {
 		console.log('no hit');

@@ -293,7 +293,7 @@ function addMarkerHiro() {
 }
 
 function explosionAnimate(ex, baseS, baseT){
-	
+	console.log(baseS);
 	ex.material.map.offset.copy (uvOffsetArray[baseS][baseT]);  
 	if (baseT === 0) {
 		if(baseS === 3){
@@ -301,6 +301,7 @@ function explosionAnimate(ex, baseS, baseT){
 		}
 		baseS++;
 		baseS %= 4;
+		
 	}
 	if(explo)
 		setTimeout (explosionAnimate(ex, baseS, (baseT + 1) % 8), 1000);
@@ -314,7 +315,7 @@ function animate() {
 	requestAnimationFrame (animate);
 	
 	if( arToolkitSource.ready === false ) return;
-	arToolkitContext.update( arToolkitSource.domElement )
+	arToolkitContext.update( arToolkitSource.domElement );
 
 	renderer.clear();
 	renderer.render (scene, camera);

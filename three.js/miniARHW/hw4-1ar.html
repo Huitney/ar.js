@@ -240,7 +240,8 @@ function buildSprite(texMat) {
 	geometry.computeVertexNormals();
 
 	let sprite = new THREE.Mesh(geometry, texMat);
-	sprite.position.z +=0.01;
+	sprite.rotation.x = Math.PI/2;
+	sprite.position.z +=0.1;
 	return sprite;
 }
 
@@ -272,7 +273,7 @@ function addMarkerHiro() {
 	setUpOffsetArray();
 
 	var loader3 = new THREE.TextureLoader();
-
+	loader3.setCrossOrigin('');
 	loader3.load(
 		'https://i.imgur.com/eknrr9t.png',
 
@@ -292,20 +293,18 @@ function addMarkerHiro() {
 	return markerRoot;
 }
 
-function explosionAnimate(ex, baseS, baseT){
-	console.log(baseS);
-	ex.material.map.offset.copy (uvOffsetArray[baseS][baseT]);  
+function explosionAnimate(baseS, baseT){
+	markerHiro.children[1].material.map.offset = uvOffsetArray[baseS][baseT];
 	if (baseT === 0) {
 		if(baseS === 3){
 			explo = false;
 		}
 		baseS++;
 		baseS %= 4;
-		
 	}
-	if(explo)
-		setTimeout (explosionAnimate(ex, baseS, (baseT + 1) % 8), 1000);
-	
+	if(explo){
+		setTimeout (explosionAnimate(baseS, (baseT + 1) % 8), 1000);
+	}
 }
 
 function animate() {
@@ -378,7 +377,7 @@ function pickCompute(ndcX, ndcY){
 	if(dist <= button.size){
 		console.log('picked');
 		explo = true;
-		explosionAnimate(markerHiro[1], 0, 0);
+		explosionAnimate(0, 1);
 	} else {
 		console.log('no hit');
 	}

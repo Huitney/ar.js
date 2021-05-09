@@ -1,0 +1,509 @@
+  
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+
+<!-- three.js library -->
+<script src='../examples/vendor/three.js/build/three.min.js'></script>
+<script src="../examples/vendor/three.js/examples/js/libs/stats.min.js"></script>
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+<script src="https://jyunming-chen.github.io/tutsplus/js/KeyboardState.js"></script>
+<script src="https://threejs.org/build/three.min.js"></script>
+
+
+<body style='margin : 0px; overflow: hidden; font-family: Monospace;'>
+
+<!-- ar.js -->
+<script src="../build/ar.js"></script>
+<script>THREEx.ArToolkitContext.baseURL = '../'</script>
+
+<style>
+#heading {
+    position : absolute;
+    text-align : center;
+    width : 100vw;
+    bottom : 80vh;
+	z-index: 1;
+}
+
+</style>
+</head>
+<body> 
+
+<script>
+
+class Button {
+	constructor (cx, cy, size, colorString = 'yellow', map){
+		this.centerX = cx;  // HUD-coord
+		this.centerY = cy;
+		this.size = size;  // circle radius
+		let material = new THREE.MeshBasicMaterial({color: colorString, transparent: true, opacity:0.7});
+		if (map) 
+		   material.map = map;
+		this.mesh = new THREE.Mesh (new THREE.CircleGeometry (size, 36), material );
+	    this.mesh.position.set (cx, cy, 0);
+	}
+	
+	setLocation (lx, ly) { // 2D-HUD 
+	    this.mesh.position.set (lx, ly, 0);
+	}
+	
+	d2To (v) { // 2-norm
+		return Math.sqrt ( (v[0]-this.centerX)*(v[0]-this.centerX) 
+				+ (v[1]-this.centerY)*(v[1]-this.centerY) );
+	}
+}
+
+class Ball{
+	constructor(ballMesh, vel, pos, force){
+		this.mesh = ballMesh;
+		this.vel = vel;
+		this.pos = pos;
+		this.force = force;
+		this.light = new THREE.PointLight( 0xffffff, 0.5);
+		this.light.position.copy(this.pos);
+		scene.add(this.mesh, this.light);
+	}
+}
+
+var renderer, stats;
+var scene, camera, sceneHUD, cameraHUD;
+var markerHiro, markerBomb;
+var arToolkitSource, arToolkitContext;
+var whRatio, halfW, halfH;
+var button;
+var _iOSDevice;
+
+var uvOffsetArray = [], explo = false;
+var keyboard = new KeyboardState();
+var cannon, barrelPart;
+var clock;
+var balls = [], parabola;
+
+init();
+animate();
+
+function init() {
+
+	let _iOSDevice = !!navigator.platform.match(/iPhone|iPod|iPad/);
+
+	console.log ('iOS: ' + _iOSDevice)
+	
+	renderer	= new THREE.WebGLRenderer({
+		// antialias	: true,
+		alpha: true
+	});
+	renderer.setClearColor(new THREE.Color('lightgrey'), 0)
+    
+	renderer.setSize( window.innerWidth, window.innerHeight );
+	renderer.domElement.style.position = 'absolute'
+	renderer.domElement.style.top = '0px'
+	renderer.domElement.style.left = '0px'
+	document.body.appendChild( renderer.domElement );
+	
+	// for multi-pass rendering
+	renderer.autoClear = false;
+
+	// width/height ratio
+	whRatio = window.innerWidth/window.innerHeight;
+		console.log ('[onInit] width: ' + window.innerWidth)	
+		console.log ('[onInit] height: ' + window.innerHeight)	
+
+	// init scene and camera
+	scene	= new THREE.Scene();
+	// Create a camera
+	camera = new THREE.PerspectiveCamera(50,window.innerWidth/window.innerHeight,1,100);
+	scene.add(camera);
+
+	//camera.position.set(0,25,200);
+	// for HUD scene
+	sceneHUD = new THREE.Scene();
+	
+	halfH = 10;
+	halfW = halfH * whRatio;
+	
+	cameraHUD = new THREE.OrthographicCamera (-halfW,halfW, halfH,-halfH, -10,10);
+
+	///////////////////////////////////////////////////////
+	
+	let loader = new THREE.TextureLoader();
+	loader.setCrossOrigin(''); 
+	loader.load(
+    	// resource URL
+    	'https://i.imgur.com/8FQCB3B.png',
+
+    	// Function when resource is loaded
+    	function(texture) {
+      		console.log ('texture loaded ...')
+			var buttonSize = halfH/3; // radius
+			button = new Button (halfW/2, -halfH/2, buttonSize, 'white', texture); //position
+			sceneHUD.add (button.mesh);
+    	},
+
+  	);
+
+
+	
+	////////////////////////////////////////////////////////////////////////////////
+	//          handle arToolkitSource
+	////////////////////////////////////////////////////////////////////////////////
+
+	arToolkitSource = new THREEx.ArToolkitSource({
+		// to read from the webcam 
+		sourceType : 'webcam',
+
+		// to read from an image
+		// sourceType : 'image',
+		// sourceUrl : THREEx.ArToolkitContext.baseURL + '../data/images/img.jpg',		
+
+		// to read from a video
+		// sourceType : 'video',
+		// sourceUrl : THREEx.ArToolkitContext.baseURL + '../data/videos/headtracking.mp4',		
+	})
+
+	arToolkitSource.init(function onReady(){
+		onResize();
+	})
+	
+	////////////////////////////////////////////////////////////////////////////////
+	//          initialize arToolkitContext
+	////////////////////////////////////////////////////////////////////////////////
+	
+	// create atToolkitContext
+	arToolkitContext = new THREEx.ArToolkitContext({
+		cameraParametersUrl: THREEx.ArToolkitContext.baseURL + '../data/data/camera_para.dat',
+		detectionMode: 'mono',
+		maxDetectionRate: 30,
+		canvasWidth: 80*3,
+		canvasHeight: 60*3,
+	})
+	// initialize it
+	arToolkitContext.init(function onCompleted(){
+		// copy projection matrix to camera
+		camera.projectionMatrix.copy( arToolkitContext.getProjectionMatrix() );
+	})
+	
+	////////////////////////////////////////////////////////////////////////////////
+	//          Create a ArMarkerControls
+	////////////////////////////////////////////////////////////////////////////////
+	markerHiro = addMarkerHiro();
+	markerBomb = addMarkerBomb();
+	scene.add(markerHiro, markerBomb);
+	
+	let localCamera = markerHiro.worldToLocal(new THREE.Vector3(0,0,0));	
+	let point = new THREE.Vector3(0,0,1);
+	let angle = point.angleTo(localCamera);
+	let axis = new THREE.Vector3();
+	axis.crossVectors(point,localCamera).normalize();
+	markerHiro.quaternion.setFromAxisAngle(axis,angle);
+	
+	//////////////////////////////////////////////////////////////////////////////////
+	//		render the whole thing on the page
+	//////////////////////////////////////////////////////////////////////////////////
+	stats = new Stats();
+	document.body.appendChild( stats.dom );
+	
+	// handle resize: can be iPAD change orientation
+	window.addEventListener('resize', function(){
+		onResize();
+	})
+	
+	if (_iOSDevice) {
+    	window.addEventListener('touchstart', onTouchStart, false);
+	} else {
+		window.addEventListener ('mousedown', onMouseDown, false);
+
+    }
+	
+	//////////////////
+	clock = new THREE.Clock();
+
+}
+
+function setUpOffsetArray() {
+	var rowCount = 4; // 4x8 sprites
+	var colCount = 8;
+	for (var i = 0; i < rowCount; i++) {
+		var row = [];
+		for (var j = 0; j < colCount; j++)
+		row.push(new THREE.Vector2(j * 0.125, - 0.25 * i));
+		uvOffsetArray.push(row);
+  }	
+}
+
+function buildSprite(texMat) {
+
+	let points = [];
+	points.push(
+		new THREE.Vector3(-1.5, -1.5, 0),
+		new THREE.Vector3(1.5, -1.5, 0),
+		new THREE.Vector3(1.5, 1.5, 0),
+		new THREE.Vector3(-1.5, 1.5, 0)
+	);
+	var geometry = new THREE.BufferGeometry().setFromPoints(points);
+
+	let indices = [0,1,2, 0,2,3];
+	geometry.setIndex(indices);
+
+	let uvs = []
+	uvs.push (0,0.75, 0.125,0.75, 0.125,1, 0,1);
+	geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+
+	geometry.computeBoundingSphere();
+	geometry.computeFaceNormals();
+	geometry.computeVertexNormals();
+
+	let sprite = new THREE.Mesh(geometry, texMat);
+	sprite.rotation.x = Math.PI/2;
+	sprite.position.z +=0.1;
+	return sprite;
+}
+
+function addMarkerBomb() {
+	
+	let markerRoot = new THREE.Group();
+	var artoolkitMarker = new THREEx.ArMarkerControls(arToolkitContext, markerRoot, {
+		type : 'pattern',
+		patternUrl : THREEx.ArToolkitContext.baseURL + '../data/data/bomb.patt'
+	});
+	let loader2 = new THREE.TextureLoader();
+	loader2.setCrossOrigin('');
+	loader2.load(
+    	'https://i.imgur.com/Lue54nD.png',
+    	function(texture) {
+      		console.log ('texture loaded ...')
+			var texMat = new THREE.MeshBasicMaterial({
+				map: texture,
+				transparent: true, 
+				side: THREE.DoubleSide
+			});			
+			var mesh = new THREE.Mesh (new THREE.CircleGeometry (1, 36), texMat );
+			mesh.rotation.x = Math.PI/2;
+			mesh.position.y = 0.5;
+			markerRoot.add(mesh);
+    	},
+  	);
+	
+	setUpOffsetArray();
+
+	var loader3 = new THREE.TextureLoader();
+	loader3.setCrossOrigin('');
+	loader3.load(
+		'https://i.imgur.com/eknrr9t.png',
+
+		function(texture) {
+		  var texMat = new THREE.MeshBasicMaterial({
+			map: texture,
+			transparent: true, // cutout texture: set transparent: true
+			side: THREE.DoubleSide,
+		  });
+		  texture.wrapS = THREE.RepeatWrapping;
+		  texture.wrapT = THREE.RepeatWrapping;
+		  markerRoot.add(buildSprite(texMat));
+		},
+	);
+		
+
+	return markerRoot;
+}
+
+function addMarkerHiro() {
+	
+	let markerRoot = new THREE.Group();
+	var artoolkitMarker = new THREEx.ArMarkerControls(arToolkitContext, markerRoot, {
+		type : 'pattern',
+		patternUrl : THREEx.ArToolkitContext.baseURL + '../data/data/patt.hiro'
+	});
+	
+	cannon = makeCannon();
+	markerRoot.add(cannon);
+	
+	let barrel = cannon.children[1]
+	barrel.rotation.z = -Math.PI/6; // barrel angle
+	cannon.rotation.y = -Math.PI/6;
+	drawLineFirst();
+	
+	return markerRoot;
+}
+
+function explosionAnimate(baseS, baseT){
+	markerBomb.children[1].material.map.offset = uvOffsetArray[baseS][baseT];
+	if (baseT === 0) {
+		if(baseS === 3){
+			explo = false;
+		}
+		baseS++;
+		baseS %= 4;
+	}
+	if(explo){
+		setTimeout (explosionAnimate(baseS, (baseT + 1) % 8), 1000);
+	}
+}
+
+function animate() {
+	
+	
+	stats.update();
+	requestAnimationFrame (animate);
+	
+	if( arToolkitSource.ready === false ) return;
+	arToolkitContext.update( arToolkitSource.domElement );
+
+	renderer.clear();
+	renderer.render (scene, camera);
+	
+	button.mesh.material.visible = markerHiro.visible;
+	
+	renderer.render (sceneHUD, cameraHUD);
+		
+	let dt = clock.getDelta();
+	
+	for(let i=0;i<balls.length;i++){
+		if (balls[i].pos.y < 0){
+			scene.remove(balls[i]);
+			balls.splice(i,1);
+			i--;
+			explo = true;
+			explosionAnimate(0, 1);
+			continue;
+		}
+		balls[i].vel.add (balls[i].force.clone().multiplyScalar(dt));
+		balls[i].pos.add (balls[i].vel.clone().multiplyScalar(dt));
+		balls[i].mesh.position.copy (balls[i].pos);
+		balls[i].light.position.copy (balls[i].pos);
+	}
+		
+}
+	
+function onResize(){
+	arToolkitSource.onResizeElement();	
+	arToolkitSource.copyElementSizeTo(renderer.domElement);
+	if( arToolkitContext.arController !== null ){
+		arToolkitSource.copyElementSizeTo(arToolkitContext.arController.canvas)	
+	}	
+	
+	whRatio = window.innerWidth/window.innerHeight;
+		console.log ('[onResize] width: ' + renderer.domElement.width)	
+		console.log ('[onResize] height: ' + renderer.domElement.height)	
+		console.log ('[onResize] whRatio: ' + whRatio)	
+	
+	halfW = halfH * whRatio;
+	cameraHUD.left = -halfW;
+	cameraHUD.right = halfW;
+	cameraHUD.top = halfH;
+	cameraHUD.bottom = -halfH;
+	cameraHUD.updateProjectionMatrix();
+
+}
+	
+function makeCannon() {
+	let cannon = new THREE.Group();
+	let body = new THREE.Mesh (new THREE.SphereGeometry(
+		10,20,20, Math.PI+Math.PI*0.1,Math.PI*1.8,0,Math.PI/2), new THREE.MeshNormalMaterial());
+	barrelPart = new THREE.Group();
+	let barrel = new THREE.Mesh (new THREE.CylinderGeometry(2,2,20,18), new THREE.MeshNormalMaterial());
+	barrelPart.add (barrel);
+	barrel.position.y = 10;
+
+	cannon.add (body, barrelPart);
+	return cannon;
+}	
+
+function computeInitPosVel() {
+	let barrel = cannon.children[1];
+	const SPEED = 25;
+	let vel = barrel.localToWorld (new THREE.Vector3(0,20,0)).sub (
+		barrel.localToWorld (new THREE.Vector3(0,0,0))).setLength (SPEED);
+	let pos = barrel.localToWorld (new THREE.Vector3(0,22,0));
+	let force = new THREE.Vector3(0,-10,0);
+	return [vel, pos, force];
+}
+
+function drawLineFirst(){
+	let points = [];
+    const SPEED = 25;
+    let vel = barrelPart.localToWorld(new THREE.Vector3(0,20,0)).sub(
+    barrelPart.localToWorld(new THREE.Vector3(0,0,0))).setLength(SPEED);
+    let pos = barrelPart.localToWorld(new THREE.Vector3(0,22,0));
+	let force = new THREE.Vector3(0,-10,0);
+	
+  	for (let i = 0; pos.y > 0; i++) {
+		points.push(pos.clone());
+		vel.add(force.clone().multiplyScalar(0.05));
+		pos.add(vel.clone().multiplyScalar(0.05));
+    }
+	
+	let geometry = new THREE.BufferGeometry().setFromPoints(points);
+	parabola = new THREE.Line (geometry, new THREE.LineDashedMaterial({color:'white'}));
+	parabola.computeLineDistances(); // required for LineDashedMaterial
+	//return parabola;
+	scene.add(parabola);
+	
+}
+
+function drawLine(){
+	let points = [];
+    const SPEED = 25;
+    let vel = barrelPart.localToWorld(new THREE.Vector3(0,20,0)).sub(
+    barrelPart.localToWorld(new THREE.Vector3(0,0,0))).setLength(SPEED);
+    let pos = barrelPart.localToWorld(new THREE.Vector3(0,22,0));
+	let force = new THREE.Vector3(0,-10,0);
+	
+  	for (let i = 0; pos.y > 0; i++) {
+		points.push(pos.clone());
+		vel.add(force.clone().multiplyScalar(0.05));
+		pos.add(vel.clone().multiplyScalar(0.05));
+    }
+	
+	let geometry = new THREE.BufferGeometry().setFromPoints(points);
+	parabola.geometry = geometry;
+	parabola.computeLineDistances(); // required for LineDashedMaterial
+}
+
+function onMouseDown (event) {
+	event.preventDefault();
+	let ndcX = (event.clientX / window.innerWidth) * 2 - 1;
+	let ndcY = -(event.clientY / window.innerHeight) * 2 + 1;
+
+	pickCompute (ndcX, ndcY);	
+	
+	
+}	
+
+function onTouchStart (event) {
+   if (event.touches.length == 1) {
+        
+		event.preventDefault();
+		let ndcX = ( event.touches[0].pageX / window.innerWidth ) * 2 - 1;
+		let ndcY = - ( event.touches[0].pageY / window.innerHeight ) * 2 + 1;
+	
+		pickCompute (ndcX, ndcY);		
+		
+	}	
+}
+
+function pickCompute(ndcX, ndcY){
+	let HUD_coord = [halfW*ndcX, halfH*ndcY];
+	
+	let dist = button.d2To(HUD_coord);
+	let printStr = [dist.toFixed(2), HUD_coord[0].toFixed(2), HUD_coord[1].toFixed(2)];
+	
+	if(dist <= button.size){
+		console.log('picked');
+		let value = computeInitPosVel();
+		let ball = new Ball(new THREE.Mesh (new THREE.SphereGeometry(2,8,8), new THREE.MeshPhongMaterial({color:'yellow',wireframe:true})), 0, 0, 0);
+		balls.push(ball);
+		balls[balls.length - 1].vel = value[0];
+		balls[balls.length - 1].pos = value[1];
+		balls[balls.length - 1].force = value[2];
+	} else {
+		console.log('no hit');
+	}
+}	
+
+
+</script>
+</body>
+</html>

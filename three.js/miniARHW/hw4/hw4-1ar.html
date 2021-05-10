@@ -5,16 +5,16 @@
 <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 
 <!-- three.js library -->
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
 <script src='../examples/vendor/three.js/build/three.min.js'></script>
 <script src="../examples/vendor/three.js/examples/js/libs/stats.min.js"></script>
-<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
-<script src="https://threejs.org/build/three.min.js"></script>
-
-<body style='margin : 0px; overflow: hidden; font-family: Monospace;'>
-
 <!-- ar.js -->
 <script src="../build/ar.js"></script>
 <script>THREEx.ArToolkitContext.baseURL = '../'</script>
+
+<script src="explode.js"></script>
+
+<body style='margin : 0px; overflow: hidden; font-family: Monospace;'>
 
 <style>
 #heading {
@@ -60,8 +60,6 @@ var arToolkitSource, arToolkitContext;
 var whRatio, halfW, halfH;
 var button;
 var _iOSDevice;
-
-var uvOffsetArray = [], explo = false;
 
 init();
 animate();
@@ -171,6 +169,7 @@ function init() {
 	////////////////////////////////////////////////////////////////////////////////
 	markerHiro = addMarkerHiro();
 	scene.add(markerHiro);
+	initSprite(markerHiro);
 	
 	let localCamera = markerHiro.worldToLocal(new THREE.Vector3(0,0,0));	
 	let point = new THREE.Vector3(0,0,1);
@@ -202,45 +201,6 @@ function init() {
 
 }
 
-function setUpOffsetArray() {
-	var rowCount = 4; // 4x8 sprites
-	var colCount = 8;
-	for (var i = 0; i < rowCount; i++) {
-		var row = [];
-		for (var j = 0; j < colCount; j++)
-		row.push(new THREE.Vector2(j * 0.125, - 0.25 * i));
-		uvOffsetArray.push(row);
-  }	
-}
-
-function buildSprite(texMat) {
-
-	let points = [];
-	points.push(
-		new THREE.Vector3(-1.5, -1.5, 0),
-		new THREE.Vector3(1.5, -1.5, 0),
-		new THREE.Vector3(1.5, 1.5, 0),
-		new THREE.Vector3(-1.5, 1.5, 0)
-	);
-	var geometry = new THREE.BufferGeometry().setFromPoints(points);
-
-	let indices = [0,1,2, 0,2,3];
-	geometry.setIndex(indices);
-
-	let uvs = []
-	uvs.push (0,0.75, 0.125,0.75, 0.125,1, 0,1);
-	geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-
-	geometry.computeBoundingSphere();
-	geometry.computeFaceNormals();
-	geometry.computeVertexNormals();
-
-	let sprite = new THREE.Mesh(geometry, texMat);
-	sprite.rotation.x = Math.PI/2;
-	sprite.position.z +=0.1;
-	return sprite;
-}
-
 function addMarkerHiro() {
 	
 	let markerRoot = new THREE.Group();
@@ -265,42 +225,8 @@ function addMarkerHiro() {
 			markerRoot.add(mesh);
     	},
   	);
-	
-	setUpOffsetArray();
-
-	var loader3 = new THREE.TextureLoader();
-	loader3.setCrossOrigin('');
-	loader3.load(
-		'https://i.imgur.com/eknrr9t.png',
-
-		function(texture) {
-		  var texMat = new THREE.MeshBasicMaterial({
-			map: texture,
-			transparent: true, // cutout texture: set transparent: true
-			side: THREE.DoubleSide,
-		  });
-		  texture.wrapS = THREE.RepeatWrapping;
-		  texture.wrapT = THREE.RepeatWrapping;
-		  markerRoot.add(buildSprite(texMat));
-		},
-	);
-		
 
 	return markerRoot;
-}
-
-function explosionAnimate(baseS, baseT){
-	markerHiro.children[1].material.map.offset = uvOffsetArray[baseS][baseT];
-	if (baseT === 0) {
-		if(baseS === 3){
-			explo = false;
-		}
-		baseS++;
-		baseS %= 4;
-	}
-	if(explo){
-		setTimeout (explosionAnimate(baseS, (baseT + 1) % 8), 1000);
-	}
 }
 
 function animate() {
@@ -372,8 +298,7 @@ function pickCompute(ndcX, ndcY){
 	
 	if(dist <= button.size){
 		console.log('picked');
-		explo = true;
-		explosionAnimate(0, 1);
+		setTimeout (spriteAnimate, 0);
 	} else {
 		console.log('no hit');
 	}

@@ -106,7 +106,7 @@ function animate() {
 	
 	for(let i=0;i<balls.length;i++){
 		if (balls[i].pos.y < 0){
-			scene.remove(balls[i]);
+			balls[i].visible = false;
 			balls.splice(i,1);
 			i--;
 			continue;

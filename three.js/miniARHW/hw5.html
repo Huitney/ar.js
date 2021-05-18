@@ -13,6 +13,7 @@
 <script>THREEx.ArToolkitContext.baseURL = '../'</script>
 
 <script src="explode.js"></script>
+<script src="Projectile.js"></script>
 
 <body style='margin : 0px; overflow: hidden; font-family: Monospace;'>
 
@@ -41,7 +42,7 @@ var clock = new THREE.Clock();
 var balls = [], parabola;
 var counter, N, angle;
 var v, g, theta;
-var bomb = 0, distance;
+var bomb = 2, distance;
 
 class Ball{
 	constructor(ballMesh, vel, pos, force){
@@ -168,11 +169,7 @@ function init() {
 	
 	q1 = new THREE.Quaternion(); // null rotation
 	q2 = new THREE.Quaternion();
-	distance = markerHiro.worldToLocal(markerKanji.localToWorld(new THREE.Vector3(0, 0, 0)));
-	q1.setFromUnitVectors(new THREE.Vector3(1, 0, 0), markerHiro.children[0].position.clone().normalize());
-    q2.setFromUnitVectors(new THREE.Vector3(1, 0, 0), distance.clone().normalize());
-	N = 100;
-    counter = 0;
+	
 }
 
 function addMarkerHiro() {
@@ -237,7 +234,9 @@ function animate() {
 	
 	for(let i=0;i<balls.length;i++){
 		if (balls[i].pos.y < 0){
-			scene.remove(balls[i]);
+			balls[i].visible = false;
+			markerKanji.children[0].visible = false;
+			markerKanji.children[1].visible = false;
 			balls.splice(i,1);
 			i--;
 			continue;
@@ -245,18 +244,28 @@ function animate() {
 		balls[i].vel.add (balls[i].force.clone().multiplyScalar(dt));
 		balls[i].pos.add (balls[i].vel.clone().multiplyScalar(dt));
 		balls[i].mesh.position.copy (balls[i].pos);
+		//console.log(balls[i].pos);
+	}
+	
+	if(markerHiro.visible === true & markerKanji.visible === true & bomb === 2){
+		q1.setFromUnitVectors(new THREE.Vector3(1, 0, 0), markerHiro.localToWorld(new THREE.Vector3(0, 0, 0)).normalize());
+		q2.setFromUnitVectors(new THREE.Vector3(1, 0, 0), markerKanji.localToWorld(new THREE.Vector3(0, 0, 0)).normalize());
+		N = 100;
+		counter = 0;
+		bomb = 0;
 	}
 	
 	if(bomb === 0){
-		if (counter > N) {
+		if (counter >= N) {
 			
-			computeInitPosVel();
-			let ball = new Ball(new THREE.Mesh (new THREE.SphereGeometry(2,8,8), new THREE.MeshBasicMaterial({color:'yellow',wireframe:true})), 0, 0, 0);
+			let value = computeInitPosVel();
+			let ball = new Ball(new THREE.Mesh (new THREE.SphereGeometry(0.02,8,8), new THREE.MeshBasicMaterial({color:'yellow',wireframe:true})), 0, 0, 0);
 			balls.push(ball);
-			balls[balls.length - 1].vel = value[0];
-			balls[balls.length - 1].pos = value[1];
-			balls[balls.length - 1].force = value[2];
+			ball.vel = value[0];
+			ball.pos = value[1];
+			ball.force = value[2];
 			bomb = 1;
+			console.log(ball.pos);
 			return;
 		}
 
@@ -265,6 +274,12 @@ function animate() {
 			let qm = q1.clone();
 			qm.slerp(q2, alpha);
 			markerHiro.children[0].quaternion.copy(qm);
+			<!-- theta = computeProjectile(//distance); -->
+			<!-- let parabola = makeProjectile(); -->
+			<!-- parabola.name = 'projectile'; -->
+			<!-- scene.remove (scene.getObjectByName('projectile')); -->
+			<!-- scene.add(parabola); -->
+			<!-- parabola.quaternion.copy (qm) -->
 			++counter;
 		}
 	}
@@ -273,15 +288,6 @@ function animate() {
 		bomb = 2;
 	}
 	
-	if(distance != markerHiro.worldToLocal(markerKanji.localToWorld(new THREE.Vector3(0, 0, 0)))){
-		bomb = 0;
-		N = 100;
-		counter = 0;
-		distance = markerHiro.worldToLocal(markerKanji.localToWorld(new THREE.Vector3(0, 0, 0)));
-		q1.setFromUnitVectors(new THREE.Vector3(1, 0, 0), markerHiro.children[0].position.clone().normalize());
-		q2.setFromUnitVectors(new THREE.Vector3(1, 0, 0), distance.clone().normalize());
-	}
-	//console.log(distance);
 	renderer.render (sceneHUD, cameraHUD);
 		
 }

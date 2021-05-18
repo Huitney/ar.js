@@ -16,7 +16,8 @@
 <script src="Projectile.js"></script>
 
 <body style='margin : 0px; overflow: hidden; font-family: Monospace;'>
-
+<script src="https://threejs.org/examples/js/libs/stats.min.js"></script>
+<script src="https://threejs.org/build/three.min.js"></script>
 <style>
 #heading {
     position : absolute;
@@ -181,7 +182,7 @@ function addMarkerHiro() {
 	});
 	let cannon = makeCannon();
 	markerRoot.add (cannon);
-
+	drawLine();
 	return markerRoot;
 }
 
@@ -205,14 +206,14 @@ function addMarkerKanji() {
 			});			
 			var mesh = new THREE.Mesh (new THREE.CircleGeometry (1, 36), texMat );
 			mesh.rotation.x = Math.PI/2;
-			mesh.position.y = 0.5;
+			//mesh.position.y = 0.5;
 			markerRoot.add(mesh);
     	},
   	);
 	//castle
-	let cone = new THREE.Mesh( new THREE.ConeGeometry( .5, 2, 32 ), new THREE.MeshBasicMaterial( {color: 0x00e5ff} ) );
-	cone.position.y = 2;
-	let cylinder = new THREE.Mesh( new THREE.CylinderGeometry( .5, .5, 2, 32 ), new THREE.MeshBasicMaterial( {color: 0x006aff} ) );
+	let cone = new THREE.Mesh( new THREE.ConeGeometry( .25, 1, 32 ), new THREE.MeshBasicMaterial( {color: 0x00e5ff} ) );
+	cone.position.y = 1;
+	let cylinder = new THREE.Mesh( new THREE.CylinderGeometry( .25, .25, 1, 32 ), new THREE.MeshBasicMaterial( {color: 0x006aff} ) );
 	let castle = new THREE.Group();
 	castle.add(cone, cylinder);
 	markerRoot.add(castle);
@@ -248,8 +249,8 @@ function animate() {
 	}
 	
 	if(markerHiro.visible === true & markerKanji.visible === true & bomb === 2){
-		q1.setFromUnitVectors(new THREE.Vector3(1, 0, 0), markerHiro.localToWorld(new THREE.Vector3(0, 0, 0)).normalize());
-		q2.setFromUnitVectors(new THREE.Vector3(1, 0, 0), markerKanji.localToWorld(new THREE.Vector3(0, 0, 0)).normalize());
+		q1.copy(q2); // save current (old) orientation
+		q2.setFromUnitVectors(new THREE.Vector3(1, 0, 0),markerHiro.worldToLocal(markerKanji.localToWorld(new THREE.Vector3()).clone().normalize()));
 		N = 100;
 		counter = 0;
 		bomb = 0;
@@ -274,12 +275,9 @@ function animate() {
 			let qm = q1.clone();
 			qm.slerp(q2, alpha);
 			markerHiro.children[0].quaternion.copy(qm);
-			<!-- theta = computeProjectile(//distance); -->
-			<!-- let parabola = makeProjectile(); -->
-			<!-- parabola.name = 'projectile'; -->
-			<!-- scene.remove (scene.getObjectByName('projectile')); -->
-			<!-- scene.add(parabola); -->
-			<!-- parabola.quaternion.copy (qm) -->
+			
+			drawLine();
+			
 			++counter;
 		}
 	}
@@ -316,11 +314,11 @@ function onResize(){
 function makeCannon() {
 	let cannon = new THREE.Group();
 	let body = new THREE.Mesh (new THREE.SphereGeometry(
-		0.5,20,20, Math.PI+Math.PI*0.1,Math.PI*1.8,0,Math.PI/2), new THREE.MeshNormalMaterial());
+		0.25,20,20, Math.PI+Math.PI*0.1,Math.PI*1.8,0,Math.PI/2), new THREE.MeshNormalMaterial());
 	barrelPart = new THREE.Group();
-	let barrel = new THREE.Mesh (new THREE.CylinderGeometry(.1,.1,1,18), new THREE.MeshNormalMaterial());
+	let barrel = new THREE.Mesh (new THREE.CylinderGeometry(.05,.05,0.5,18), new THREE.MeshNormalMaterial());
 	barrelPart.add (barrel);
-	barrel.position.y = 1;
+	barrel.position.y = 0.5;
 
 	cannon.add (body, barrelPart);
 	return cannon;
@@ -336,7 +334,29 @@ function computeInitPosVel() {
 	return [vel, pos, force];
 }
 
-
+function drawLine(){
+	let points = [];
+    const SPEED = 1.25;
+    let vel = barrelPart.localToWorld(new THREE.Vector3(0,0.5,0)).sub(
+    barrelPart.localToWorld(new THREE.Vector3(0,0,0))).setLength(SPEED);
+    let pos = barrelPart.localToWorld(new THREE.Vector3(0,1.1,0));
+	let force = new THREE.Vector3(0,-0.5,0);
+	
+  	for (let i = 0; pos.y > 0; i++) {
+		points.push(pos.clone());
+		vel.add(force.clone().multiplyScalar(0.05));
+		pos.add(vel.clone().multiplyScalar(0.05));
+    }
+	
+	let geometry = new THREE.BufferGeometry().setFromPoints(points);
+	parabola = new THREE.Line (geometry, new THREE.LineDashedMaterial({color:'white'}));
+	parabola.name = 'projectile';
+	scene.remove (scene.getObjectByName('projectile'));
+	parabola.computeLineDistances(); // required for LineDashedMaterial
+	//return parabola;
+	scene.add(parabola);
+	//parabola.y += 1;
+}
 </script>
 </body>
 </html>

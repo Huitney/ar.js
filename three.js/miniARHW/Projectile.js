@@ -1,5 +1,5 @@
 function computeProjectile(distance) {
-	let L = distance.length;
+	let L = distance.length();
 	let theta = Math.asin(L*g/v/v)/2;
 	//console.log (L*g/v/v)
 	if (L*g/v/v > 1) {
@@ -7,7 +7,7 @@ function computeProjectile(distance) {
 	} else {
 		//$('#msg').text ('reachable')
 	}
-	markerHiro.children[0].children[1].rotation.z = -(Math.PI/2 - theta);
+	markerHiro.children[0].children[1].rotation.z = -(Math.PI/2 - Math.asin(distance.length()*g/v/v)/2);
 	return theta;
 }
 function makeProjectile () {

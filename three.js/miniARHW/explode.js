@@ -92,6 +92,8 @@ function _spriteAnimate() {
 		setTimeout (_spriteAnimate, 100); // proceed to next frame
 	else {
 		sprite.material.map.offset.copy (uvOffsetArray[0][0]);  // back to first frame
+		baseS = 3 ;
+		baseT = 7;
 	}
 }
 
